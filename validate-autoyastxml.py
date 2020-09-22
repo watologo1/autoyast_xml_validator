@@ -171,14 +171,17 @@ def validate_xml(args, xml):
 
     """
     # check xml syntax with xmllint
-    run(
+    process_xmllint = run(
         ['xmllint', '--noout', '--relaxng', args.profile, '/dev/stdin'],
         stdout=PIPE,
         stderr=PIPE,
         input=xml,
         text=True,
-        check=True,
     )
+    log.debug('xmllint return code: %s', process_xmllint.returncode)
+    if process_xmllint.stderr.strip():
+        log.debug('xmllint stderr: %s', process_xmllint.stderr.strip())
+
     # check RELAX NG schema with jing
     process_jing = run(
         ['jing', args.profile, '/dev/stdin'],
@@ -186,7 +189,6 @@ def validate_xml(args, xml):
         stderr=PIPE,
         input=xml,
         text=True,
-        check=True,
     )
     log.debug('jing return code: %s', process_jing.returncode)
     if process_jing.stderr.strip():
@@ -195,9 +197,9 @@ def validate_xml(args, xml):
     # if the XML is valid. As 0 is falsy in Python, bool(0) would return
     # False. Thus it is needed to invert the bool with a 'not' to adapt it
     # to our needs.
-    return not bool(
-        process_jing.returncode
-    )  # return True if both checks have a returncode of 0
+    # return True if both checks have a returncode of 0
+    successfully_validated = not (process_xmllint.returncode and process_jing.returncode)
+    return successfully_validated
 
 
 if __name__ == '__main__':
