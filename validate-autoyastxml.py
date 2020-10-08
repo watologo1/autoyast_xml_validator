@@ -198,7 +198,7 @@ def validate_xml(args, xml):
     # False. Thus it is needed to invert the bool with a 'not' to adapt it
     # to our needs.
     # return True if both checks have a returncode of 0
-    successfully_validated = not (process_xmllint.returncode and process_jing.returncode)
+    successfully_validated = not (process_xmllint.returncode or process_jing.returncode)
     return successfully_validated
 
 
