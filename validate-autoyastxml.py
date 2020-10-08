@@ -155,7 +155,7 @@ def get_xml(args):
     else:
         # TODO: Recognize which flag to use automagically
         log.error(
-            'No flag set. Please set a flag state hiw to parse the input'
+            'No flag set. Please set a flag state how to parse the input'
         )
 
     return xml.strip()
