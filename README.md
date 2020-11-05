@@ -2,7 +2,7 @@
 Use this script to validate AutoYaST XML config files.
 
 ## Setup
-1. Install necessary dependencies: `zypper install jing libxml2 yast2-schema`
+Install necessary dependencies: `zypper install jing libxml2 yast2-schema`
 
 ## Usage
 
