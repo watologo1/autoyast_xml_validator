@@ -40,5 +40,6 @@ This script extracts the RELAX NG schema files of different OS versions to direc
 Use this script to deploy different OS versions on a server via cobbler and check for AutoYaST config XML errors using `validate-autoyastxml.py` and the related RELAX NG schema files.
 
 ## Usage
-1. Edit the variables in the script if necessary
-2. Run the script: `./test_distro_autoyast_xml.sh`
+1. Edit the variables in the script if necessary.
+2. If there's no `yast2_schema` directory, run `./generate_yast2_schema.sh` to generate it.
+3. Run the test: `./test_distro_autoyast_xml.sh`
