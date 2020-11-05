@@ -60,28 +60,28 @@ def parse(cliargs=None):
     :rtype: class:`argparse.Namespace`
 
     """
-    parser = argparse.ArgumentParser(description='Validate autoyast XML')
+    parser = argparse.ArgumentParser(description='Validate AutoYaST XML')
     parsergroup = parser.add_mutually_exclusive_group(required=True)
     parsergroup.add_argument(
         '-u',
         '--url',
         action='store_true',
         default=False,
-        help='use autoyast XML from URL (default: %(default)s)',
+        help='use AutoYaST XML from URL (default: %(default)s)',
     )
     parsergroup.add_argument(
         '-m',
         '--machine',
         action='store_true',
         default=False,
-        help='use autoyast XML from machine (default: %(default)s)',
+        help='use AutoYaST XML from machine (default: %(default)s)',
     )
     parsergroup.add_argument(
         '-f',
         '--file',
         action='store_true',
         default=False,
-        help='Use autoyast XML from file (default: %(default)s)',
+        help='Use AutoYaST XML from file (default: %(default)s)',
     )
     parser.add_argument(
         '-c',
@@ -103,7 +103,7 @@ def parse(cliargs=None):
         '-v', '--verbose', action='count', help='Raise verbosity level',
     )
     parser.add_argument(
-        'string', metavar='STRING', help='string that locates autoyast XML',
+        'string', metavar='STRING', help='string that locates AutoYaST XML',
     )
     args = parser.parse_args(cliargs)
 
@@ -131,7 +131,7 @@ def get_xml(args):
     """Get XML string from different soruces, depending on CLI args.
 
     :param args: arguments passed to CLI
-    :returns: autoyast XML
+    :returns: AutoYaST XML
     :rtype: str
 
     """
@@ -165,8 +165,8 @@ def validate_xml(args, xml):
     """Check xml for errors with xmllint.
 
     :param args: arguments passed to CLI
-    :param xml: autoyast XML as string
-    :returns: returns: returns: return if autoyast XML validates
+    :param xml: AutoYaST XML as string
+    :returns: returns: returns: return if AutoYaST XML validates
     :rtype: bool
 
     """
