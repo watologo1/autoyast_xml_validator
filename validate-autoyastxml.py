@@ -67,15 +67,9 @@ def parse(cliargs=None):
         '--url',
         action='store_true',
         default=False,
-        help='use AutoYaST XML from URL (default: %(default)s)',
+        help='Use AutoYaST XML from URL (default: %(default)s)',
     )
-    parsergroup.add_argument(
-        '-m',
-        '--machine',
-        action='store_true',
-        default=False,
-        help='use AutoYaST XML from machine (default: %(default)s)',
-    )
+   
     parsergroup.add_argument(
         '-f',
         '--file',
@@ -84,20 +78,18 @@ def parse(cliargs=None):
         help='Use AutoYaST XML from file (default: %(default)s)',
     )
     parser.add_argument(
-        '-c',
-        '--cobbler',
+        '-o',
+        '--output',
         action='store',
-        default='10.161.0.99',
-        help='Cobbler IP address',
-        required=False,
+        default=False,
+        help="File path where downloaded file from url is saved  (default: %(default)s)",
     )
     parser.add_argument(
         '-p',
         '--profile',
         action='store',
-        default='/usr/share/YaST2/schema/autoyast/rng/profile.rng',
         help='Path to RELAX NG schema to use to validate XML',
-        required=False,
+        required=True,
     )
     parser.add_argument(
         '-v', '--verbose', action='count', help='Raise verbosity level',
@@ -127,7 +119,7 @@ def get_content_from_url(url):
     return site_content
 
 
-def get_xml(args):
+def process_xml(args):
     """Get XML string from different soruces, depending on CLI args.
 
     :param args: arguments passed to CLI
@@ -139,24 +131,15 @@ def get_xml(args):
 
     if args.url:
         xml = get_content_from_url(args.string)
-    elif args.machine:
-        machine_fqdn = getfqdn(args.string)
-        # sometimes it can't find the FQDN. Use hardcoded .arch.suse.de in
-        # those cases
-        if '.' not in machine_fqdn:
-            machine_fqdn += '.arch.suse.de'
-        log.debug('FQDN of machine is %s', machine_fqdn)
-        url = COBBLER_XML_URL.format(args.cobbler, machine_fqdn)
-        log.debug('XML content located at URL: %s', url)
-        xml = get_content_from_url(url)
     elif args.file:
-        with open(args.string) as xml_file:
-            xml = xml_file.read()
-    else:
-        # TODO: Recognize which flag to use automagically
-        log.error(
-            'No flag set. Please set a flag state how to parse the input'
-        )
+        with open(args.string) as input_xml_file:
+            xml = input_xml_file.read()
+            
+    if args.output:
+        with open(args.output, "w") as output_xml_file:
+            output_xml_file.write(xml)
+        if not xml:
+            log.debug("passed XML content is empty!")
 
     return xml.strip()
 
@@ -179,8 +162,8 @@ def validate_xml(args, xml):
         text=True,
     )
     log.debug('xmllint return code: %s', process_xmllint.returncode)
-    if process_xmllint.stderr.strip():
-        log.debug('xmllint stderr: %s', process_xmllint.stderr.strip())
+    if output_xmllint := process_xmllint.stderr.strip():  # xmllint outputs its errors to stderr
+        log.debug('xmllint stderr: %s', output_xmllint)
 
     # check RELAX NG schema with jing
     process_jing = run(
@@ -191,8 +174,9 @@ def validate_xml(args, xml):
         text=True,
     )
     log.debug('jing return code: %s', process_jing.returncode)
-    if process_jing.stderr.strip():
-        log.debug('jing stderr: %s', process_jing.stderr.strip())
+    if output_jing := process_jing.stdout.strip():   # jing outputs its errors to stdout
+        log.debug('jing stdout: %s', output_jing)
+
     # A returncode of 0 means "good". But the function should return True
     # if the XML is valid. As 0 is falsy in Python, bool(0) would return
     # False. Thus it is needed to invert the bool with a 'not' to adapt it
@@ -206,18 +190,20 @@ if __name__ == '__main__':
     RETURN_CODE = 0
     args = parse()
     try:
-        xml = get_xml(args)
+        xml = process_xml(args)
         if not validate_xml(args, xml):
-            raise SyntaxError('XML has wrong Syntax.')
+            if args.output:
+                raise SyntaxError('XML has wrong syntax. Please check the output file: {0}'.format(args.output))
+            else:
+                raise SyntaxError('XML has wrong syntax.')
     except IOError as err:
-        log.error('IOError: %s', err)
+        log.debug('IOError: %s', err)
         RETURN_CODE = 3
     except SyntaxError as err:
-        log.error('SyntaxError: %s', err)
+        log.info('SyntaxError: %s', err)
         RETURN_CODE = 2
-    except:
+    except Exception:
         RETURN_CODE = 1
 
     sys.exit(RETURN_CODE)
-
 # EOF
