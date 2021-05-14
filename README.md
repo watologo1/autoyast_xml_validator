@@ -28,3 +28,10 @@ optional arguments:
                         Path to RELAX NG schema to use to validate XML
   -v, --verbose         Raise verbosity level
 ```
+
+## Return
+0:  Successful XML validation
+1:  Unknown error
+2:  Syntax error
+3:  IO error
+99: XML validation failed

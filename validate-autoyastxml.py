@@ -4,9 +4,10 @@ import argparse
 import logging
 import sys
 import types
+import tempfile
 from logging.config import dictConfig
 from socket import getfqdn
-from subprocess import PIPE, run
+from subprocess import PIPE, Popen
 from urllib.request import urlopen
 
 # Global
@@ -21,7 +22,7 @@ DEFAULT_LOGGING_DICT = types.MappingProxyType(
         'version': 1,
         'disable_existing_loggers': False,
         'formatters': {
-            'standard': {'format': '[%(levelname)s] %(name)s: %(message)s'},
+            'standard': {'format': '[%(levelname)s]: %(message)s'},
         },
         'handlers': {
             'default': {
@@ -103,6 +104,10 @@ def parse(cliargs=None):
         '-v', '--verbose', action='count', help='Raise verbosity level',
     )
     parser.add_argument(
+        '-s', '--store_xml', action='store_true', default=False,
+        help='Always store retrieved XML file, not only in error case',
+    )
+    parser.add_argument(
         'string', metavar='STRING', help='string that locates autoyast XML',
     )
     args = parser.parse_args(cliargs)
@@ -171,35 +176,59 @@ def validate_xml(args, xml):
 
     """
     # check xml syntax with xmllint
-    process_xmllint = run(
-        ['xmllint', '--noout', '--relaxng', args.profile, '/dev/stdin'],
-        stdout=PIPE,
-        stderr=PIPE,
-        input=xml,
-        text=True,
-    )
-    log.debug('xmllint return code: %s', process_xmllint.returncode)
-    if process_xmllint.stderr.strip():
-        log.debug('xmllint stderr: %s', process_xmllint.stderr.strip())
+    success = True
+    log_delim = "---------------------------------------------------------"
 
-    # check RELAX NG schema with jing
-    process_jing = run(
-        ['jing', args.profile, '/dev/stdin'],
+    command = ['xmllint', '--noout', '--relaxng', args.profile, '/dev/stdin']
+    process = Popen(
+        command,
         stdout=PIPE,
         stderr=PIPE,
-        input=xml,
-        text=True,
+        stdin=PIPE
     )
-    log.debug('jing return code: %s', process_jing.returncode)
-    if process_jing.stderr.strip():
-        log.debug('jing stderr: %s', process_jing.stderr.strip())
-    # A returncode of 0 means "good". But the function should return True
-    # if the XML is valid. As 0 is falsy in Python, bool(0) would return
-    # False. Thus it is needed to invert the bool with a 'not' to adapt it
-    # to our needs.
-    # return True if both checks have a returncode of 0
-    successfully_validated = not (process_xmllint.returncode or process_jing.returncode)
-    return successfully_validated
+    stdout, stderr = process.communicate(input=xml.encode())
+    log.debug('xmllint return code: %d', process.returncode)
+    if process.returncode:
+        log.warning("xmllint output %s", log_delim)
+        log.warning('stderr: %s', str(stderr, encoding='utf-8'))
+        log.warning('stdout: %s', str(stdout, encoding='utf-8'))
+        log.warning("xmllint output %s", log_delim)
+        success = False
+
+    command = ['jing', args.profile, '/dev/stdin']
+    # check RELAX NG schema with jing
+    process = Popen(
+        command,
+        stdout=PIPE,
+        stderr=PIPE,
+        stdin=PIPE,
+    )
+    stdout, stderr = process.communicate(input=xml.encode())
+    log.debug('jing return code: %d', process.returncode)
+    if process.returncode:
+        log.warning("jing output    %s", log_delim)
+        log.warning('stderr: %s', str(stderr, encoding='utf-8'))
+        log.warning('stdout: %s', str(stdout, encoding='utf-8'))
+        log.warning("jing output    %s", log_delim)
+        success = False
+
+    if not success or args.store_xml:
+        temp = tempfile.NamedTemporaryFile(prefix="autoyast_xml_validator_", delete=False)
+        temp.write(xml.encode())
+        temp.close()
+        if not success:
+            raise SyntaxError('XML has wrong Syntax. XML file store here: %s' % temp.name)
+        else:
+            print("XML file stored: %s" % temp.name)
+
+    """
+    A returncode of 0 means "good". But the function should return True
+    if the XML is valid. As 0 is falsy in Python, bool(0) would return
+    False. Thus it is needed to invert the bool with a 'not' to adapt it
+    to our needs.
+    return True if both checks have a returncode of 0
+    """
+    return success
 
 
 if __name__ == '__main__':
@@ -208,14 +237,15 @@ if __name__ == '__main__':
     try:
         xml = get_xml(args)
         if not validate_xml(args, xml):
-            raise SyntaxError('XML has wrong Syntax.')
+            RETURN_CODE = 99
     except IOError as err:
         log.error('IOError: %s', err)
         RETURN_CODE = 3
     except SyntaxError as err:
         log.error('SyntaxError: %s', err)
         RETURN_CODE = 2
-    except:
+    except Exception:
+        log.exception("Unknown Error")
         RETURN_CODE = 1
 
     sys.exit(RETURN_CODE)
