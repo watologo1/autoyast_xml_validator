@@ -35,3 +35,13 @@ optional arguments:
 2:  Syntax error
 3:  IO error
 99: XML validation failed
+
+## Retrieve latest autoyast schema files (*.rng):
+TEMP=$(mktemp -d)
+pushd "$TEMP"
+wget https://download.opensuse.org/repositories/YaST:/Head/openSUSE_Tumbleweed/x86_64/yast2-schema-4.4.2-1.1.x86_64.rpm
+rpm2cpio yast2-schema-4.4.2-1.1.x86_64.rpm |cpio -i -d
+popd "$TEMP"
+ls -d $TEMP/usr/share/YaST2/schema/autoyast
+
+
