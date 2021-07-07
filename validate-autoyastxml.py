@@ -1,10 +1,11 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
 # Copyright SUSE LCC 2021
 
 # Author: Martin Rey <mrey@suse.de> 2021
 # Author: Thomas Renninger <trenn@suse.de> 2021
 
-#!/usr/bin/python3
-# -*- coding: utf-8 -*-
 import argparse
 import logging
 import sys
