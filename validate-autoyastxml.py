@@ -19,9 +19,10 @@ from subprocess import PIPE, Popen
 from urllib.request import urlopen
 
 # Global
-COBBLER_XML_URL  = 'http://{0}/cblr/svc/op/autoinstall/system/{1}'
-PROFILE_GLOB     = '/usr/share/YaST2/schema/autoyast/distros/*'
-PROFILE_LOCATION = '/usr/share/YaST2/schema/autoyast/distros/{0}/{1}/profile.rng'
+COBBLER_XML_S_URL  = 'http://{0}/cblr/svc/op/autoinstall/system/{1}'
+COBBLER_XML_P_URL  = 'http://{0}/cblr/svc/op/autoinstall/profile/{1}'
+PROFILE_GLOB       = '/usr/share/YaST2/schema/autoyast/products/*'
+PROFILE_LOCATION   = '/usr/share/YaST2/schema/autoyast/products/{0}/{1}/profile.rng'
 
 #: The dictionary, used by :class:`logging.config.dictConfig`
 #: use it to setup your logging formatters, handlers, and loggers
@@ -71,71 +72,79 @@ def parse(cliargs=None):
     :rtype: class:`argparse.Namespace`
 
     """
-    parser = argparse.ArgumentParser(description='Validate autoyast XML')
+    parser = argparse.ArgumentParser(description='Validate autoyast XML', formatter_class=argparse.RawTextHelpFormatter)
     parsergroup = parser.add_mutually_exclusive_group(required=True)
     parsergroup.add_argument(
         '-u',
         '--url',
         action='store',
         default=False,
-        help='use autoyast XML from URL (default: %(default)s)'
-    )
-    parsergroup.add_argument(
-        '-s',
-        '--system',
-        action='store',
-        default=False,
-        help='use autoyast XML from cobbler system (default: %(default)s)'
+        help='Use autoyast XML from URL'
     )
     parsergroup.add_argument(
         '-f',
         '--file',
         action='store',
         default=False,
-        help='Use autoyast XML from file (default: %(default)s)'
+        help='Use autoyast XML from file'
+    )
+    parsergroup.add_argument(
+        '-s',
+        '--cobbler_system',
+        action='store',
+        default=False,
+        help='Use autoyast XML from cobbler system (cobbler system list)'
+    )
+    parsergroup.add_argument(
+        '-p',
+        '--cobbler_profile',
+        action='store',
+        default=False,
+        help='Use autoyast XML from cobbler profile (cobbler profile list)\n\n'
     )
     parsergroup.add_argument(
         '-l', '--list', action='store_true', default=False,
-        help='Show distros and archs (to be used with -d [ -a ] param) of installed and available XML syntax definitions'
+        help='Show products and archs (to be used with -d [ -a ] param)\nof installed and available XML syntax definitions\n\n'
     )
 
+    parser.add_argument(
+        '-r',
+        '--profile-rng',
+        action='store',
+        default='/usr/share/YaST2/schema/autoyast/rng/profile.rng',
+        help='Path to RELAX NG schema to use to validate XML\n(default: %(default)s)\n\n',
+        required=False,
+    )
     parser.add_argument(
         '-c',
         '--cobbler',
         action='store',
-        help='Cobbler IP address',
+        default='localhost',
+        help='Cobbler hostname or IP address (default: %(default)s)',
         required=False,
     )
     parser.add_argument(
-        '-p',
-        '--profile',
-        action='store',
-        default='/usr/share/YaST2/schema/autoyast/rng/profile.rng',
-        help='Path to RELAX NG schema to use to validate XML',
-        required=False,
-    )
-    parser.add_argument(
-        '-d',
-        '--distro',
+        '-P',
+        '--product',
         action='store',
         default='',
-        help='Distro to check validate against, needs yast2-schemas package',
+        help='Product to check/validate against, needs yast2-schemas package (see --list option)',
         required=False
     )
     parser.add_argument(
         '-a',
         '--arch',
         action='store',
-        default='x86_64',
-        help='Distro to check validate against, needs yast2-schemas package',
+        default='',
+        help='Architecture to check/validate against, needs yast2-schemas package (default: x86_64)\n\n',
         required=False
-    )
-    parser.add_argument(
-        '-v', '--verbose', action='count', help='Raise verbosity level'
     )
     parser.add_argument(
         '--save', action='store_true', default=False,
         help='Always store retrieved XML file, not only in error case'
+    )
+    parser.add_argument(
+        '-v', '--verbose', action='count', help='Raise verbosity level \n-v info, -vv debug e.g. to see URL from retrieved autoyast file'
     )
     args = parser.parse_args(cliargs)
 
@@ -143,6 +152,13 @@ def parse(cliargs=None):
     dictConfig(DEFAULT_LOGGING_DICT)
     log.setLevel(LOGLEVELS.get(args.verbose, logging.DEBUG))
     log.debug('CLI args: %s', args)
+
+    if args.arch and not args.product:
+        log.error("-a/--arch option needs a -P/--product option")
+        sys.exit(2)
+    if not args.arch:
+        # Need to set default here to check empty value above
+        args.arch = 'x86_64'
     return args
 
 
@@ -158,14 +174,14 @@ def get_content_from_url(url):
         site_content = xml_site.read().decode('utf-8')
     return site_content
 
-def list_distros():
+def list_products():
 
-    distro = {}
-    distro_folders = glob.glob(PROFILE_GLOB)
+    product = {}
+    product_folders = glob.glob(PROFILE_GLOB)
     print("\nList of supported distributions and architectures:\n")
-    print("Distro")
+    print("Product")
     print("[ Architectures, ]\n")
-    for f in distro_folders:
+    for f in product_folders:
         archs = []
         arch_folders = glob.glob("%s/*" % f)
         for a in arch_folders:
@@ -174,7 +190,7 @@ def list_distros():
             print(os.path.basename(f))
             print(archs)
             print()
-            distro[os.path.basename(f)] = archs
+            product[os.path.basename(f)] = archs
 
 def get_rng(args):
     """Get profile.rng file location depending on CLI args.
@@ -184,15 +200,15 @@ def get_rng(args):
     :rtype: str
 
     """
-    profile = None
+    profile_rng = None
 
-    if not args.distro:
-        profile = args.profile
+    if args.product:
+        profile_rng = PROFILE_LOCATION.format(args.product, args.arch)
     else:
-        profile = PROFILE_LOCATION.format(args.distro, args.arch)
-    if not os.path.isfile(profile):
-        raise IOError("Cannot locate %s" % profile)
-    return profile    
+        profile_rng = args.profile_rng
+    if not os.path.isfile(profile_rng):
+        raise IOError("Cannot locate %s" % profile_rng)
+    return profile_rng
 
 def get_xml(args):
     """Get XML string from different sources, depending on CLI args.
@@ -206,21 +222,25 @@ def get_xml(args):
 
     if args.url:
         xml = get_content_from_url(args.url)
-    elif args.system:
-        url = COBBLER_XML_URL.format(args.cobbler, args.system)
-        log.debug('XML content located at URL: %s', url)
+    elif args.cobbler_system:
+        url = COBBLER_XML_S_URL.format(args.cobbler, args.cobbler_system)
+        log.info('Try to download XML content located at URL: %s', url)
+        xml = get_content_from_url(url)
+    elif args.cobbler_profile:
+        url = COBBLER_XML_P_URL.format(args.cobbler, args.cobbler_profile)
+        log.info('Try to download XML content located at URL: %s', url)
         xml = get_content_from_url(url)
     elif args.file:
         with open(args.file) as xml_file:
             xml = xml_file.read()
     else:
         log.error(
-            'No autoyast.xml source specified. Use either -u, -f or -c and -s options'
+            'No autoyast.xml source specified. Use either -u, -f or -p and -s options'
         )
     return xml.strip()
 
 
-def validate_xml(args, xml, profile):
+def validate_xml(args, xml, profile_rng):
     """Check xml for errors with xmllint.
 
     :param args: arguments passed to CLI
@@ -233,7 +253,7 @@ def validate_xml(args, xml, profile):
     success = True
     log_delim = "---------------------------------------------------------"
 
-    command = ['xmllint', '--noout', '--relaxng', profile, '/dev/stdin']
+    command = ['xmllint', '--noout', '--relaxng', profile_rng, '/dev/stdin']
     process = Popen(
         command,
         stdout=PIPE,
@@ -249,7 +269,7 @@ def validate_xml(args, xml, profile):
         log.warning("xmllint output %s", log_delim)
         success = False
 
-    command = ['jing', profile, '/dev/stdin']
+    command = ['jing', profile_rng, '/dev/stdin']
     # check RELAX NG schema with jing
     process = Popen(
         command,
@@ -265,6 +285,9 @@ def validate_xml(args, xml, profile):
         log.warning('stdout: %s', str(stdout, encoding='utf-8'))
         log.warning("jing output    %s", log_delim)
         success = False
+
+    if success:
+        print("XML file successfully parsed - No errors found")
 
     if not success or args.save:
         temp = tempfile.NamedTemporaryFile(prefix="autoyast_xml_validator_", delete=False)
@@ -290,12 +313,11 @@ if __name__ == '__main__':
     args = parse()
     try:
         if args.list:
-            list_distros()
+            list_products()
         else:
-            profile = get_rng(args)
-            print(profile)
+            profile_rng = get_rng(args)
             xml = get_xml(args)
-            if not validate_xml(args, xml, profile):
+            if not validate_xml(args, xml, profile_rng):
                 RETURN_CODE = 99
     except IOError as err:
         log.error('IOError: %s', err)
