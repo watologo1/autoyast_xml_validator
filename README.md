@@ -1,12 +1,13 @@
-# validate-autoyastxml 1 2021-07-06 GNU
+# autoyast-xml-validate 1 2021-07-06 GNU
 
 ## NAME
 
-validate-autoyastxml 
+autoyast-xml-validate 
 
 ## SYNOPSIS
 
-validate-autoyastxml (-u URL | -s SYSTEM -c COBBLER | -f FILE) [-p PROFILE | -d DISTRO [ -a ARCH ] ] [-v] [-h] [--save]
+autoyast-xml-validate (-u URL | -s SYSTEM -c COBBLER | -f FILE) [-p PROFILE | -d DISTRO [ -a ARCH ] ] [-v] [-h] [--save]
+autoyast-xml-validate (-u URL | -f FILE | -c COBBLER  ( -s COBBLER_SYSTEM | -p COBBLER_PROFILE ) | -l) [-r PROFILE_RNG] [-P PRODUCT] [-a ARCH] [--save] [-v]
 
 ## DESCRIPTION
 
@@ -27,17 +28,20 @@ If none is given /usr/share/YaST2/schema/autoyast/rng/profile.rng is used (part 
   -s SYSTEM, --system SYSTEM
                         Use autoyast XML from machine (default: False)
 			Needs --cobbler
+  -p PROFILE, --profile PROFILE
+                        Use autoyast XML from cobbler profile (default: False)
+			Needs --cobbler
   -c COBBLER, --cobbler COBBLER
                         Cobbler IP address
-			Needs --system
+			Needs --system or --profile
 
 
   LOCATE XML AUTOYAST DEFINITIONS (profile.rng):
   (default: /usr/share/YaST2/schema/autoyast/rng/profile.rng)
   
-  -p PROFILE, --profile PROFILE
-                        Path to RELAX NG schema to use to validate XML
-  -d DISTRO, --distro DISTRO
+  -r PROFILE_RNG, --profile-rng PROFILE_RNG
+                        Path to RELAX NG schema to use to validate XML (profile.rng)
+  -P PRODUCT, --product PRODUCT
                         Distribution specific XML syntax to check against
                         This needs yast2-schemas package installed
                         (by default uses x86_64 installed architecture specific
@@ -46,6 +50,17 @@ If none is given /usr/share/YaST2/schema/autoyast/rng/profile.rng is used (part 
                         Needs --distro parameter
                         Chose a different architecture XML definition
                         (default x86_64)
+
+  -l, --list
+                        Show products and archs (to be used with -P [ -a ] param)
+                        of installed and available XML syntax definitions
+
+  --save
+                        Always store retrieved XML file, not only in error case.
+			Especially useful if autoyast.xml is retrieved via -u URL
+			or cobbler parameters. The file can be further edited or
+			worked on, also if syntax check was successful.
+
 
   -h, --help            show this help message and exit
   -v, --verbose         Raise verbosity level
@@ -76,13 +91,13 @@ jing libxml2 yast2-schema yast2-schemas
 
 ## EXAMPLES
 
-```validate-autoyastxml.py -f /tmp/autoyast.xml```
+```autoyast-xml-validate -f /tmp/autoyast.xml```
 
 Local autoyast.xml check - Check against a local XML file  
 (using rng files from locally installed yast2-schema package)
 
 
-```validate-autoyastxml.py -c cobbler.arch.suse.de -m zinfandel-4.arch.suse.de --save```
+```autoyast-xml-validate -c cobbler.arch.suse.de -m zinfandel-4.arch.suse.de --save```
 
 cobbler generated autoyast.xml check  
 Download and validate against a cobbler generated autoyast.xml
@@ -93,18 +108,18 @@ http://cobbler.arch.suse.de/cblr/svc/op/autoinstall/system/zinfandel-4.arch.suse
    further debugging or development.
 
 
-```validate-autoyastxml.py -c cobbler.arch.suse.de -m zinfandel-4.arch.suse.de -d sle-15-sp3 -a aarch64```
+```autoyast-xml-validate -c cobbler.arch.suse.de -m zinfandel-4.arch.suse.de -d sle-15-sp3 -a aarch64```
 
 cobbler generated autoyast.xml SLE 15 SP3 aarch64 check:  
 Download and validate against a cobbler generated autoyast.xml using SLE 15 SP3  
 aarch64 XML definitions
 
-```validate-autoyastxml.py -f /tmp/autoyast_xml_validator__di2jtqv -d sle-15-sp3 -a ppc64le```
+```autoyast-xml-validate -f /tmp/autoyast_xml_validator__di2jtqv -d sle-15-sp3 -a ppc64le```
 
 Validate (probably previously with --save param downloaded) autoyast file against  
 sle-15-sp3/ppc64le XML syntax correctness.
 
-```validate-autoyastxml.py --list```
+```autoyast-xml-validate --list```
 
 List all available distros and their XML (profile.rng) definitions found on disk
 
