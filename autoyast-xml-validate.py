@@ -103,8 +103,8 @@ def parse(cliargs=None):
         help='Use autoyast XML from cobbler profile (cobbler profile list)\n\n'
     )
     parsergroup.add_argument(
+        help='Show products and archs (to be used with -P [ -a ] param)\nof installed and available XML syntax definitions\n\n'
         '-l', '--list', action='store_true', default=False,
-        help='Show products and archs (to be used with -d [ -a ] param)\nof installed and available XML syntax definitions\n\n'
     )
 
     parser.add_argument(
